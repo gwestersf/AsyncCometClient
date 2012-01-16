@@ -7,72 +7,65 @@ import org.cometd.bayeux.client.ClientSession;
 import org.cometd.bayeux.client.ClientSession.Extension;
 import org.eclipse.jetty.util.ajax.JSON;
 
-public class TimesyncClientExtension implements Extension
-{
-    volatile int _lag;
-    volatile int _offset;
-    
-    @Override
-    public boolean rcv(ClientSession session, Mutable message)
-    {
-        return true;
-    }
-    @Override
-    public boolean rcvMeta(ClientSession session, Mutable message)
-    {
-        Map<String,Object> ext=message.getExt(false);
-        if (ext!=null)
-        {
-            Map<String,Object> sync=(Map<String,Object>)ext.get("timesync");
-            if (sync!=null)
-            {
-                long now = System.currentTimeMillis();
-                
-                final long tc=((Number)sync.get("tc")).longValue();
-                final long ts=((Number)sync.get("ts")).longValue();
-                final int p=((Number)sync.get("p")).intValue();
-                // final int a=((Number)sync.get("a")).intValue();
+public class TimesyncClientExtension implements Extension {
+	volatile int _lag;
+	volatile int _offset;
 
-                int l2 = (int) ((now - tc - p) / 2);
-                int o2 = (int) (ts-tc-l2);
+	@Override
+	public boolean rcv(ClientSession session, Mutable message) {
+		return true;
+	}
 
-                _lag=_lag==0?l2:(_lag+l2)/2;
-                _offset=_offset==0?o2:(_offset+o2)/2;   
-            }
-        }
-            
-        return true;
-    }
-    @Override
-    public boolean send(ClientSession session, Mutable message)
-    {
-        return true;
-    }
-    @Override
-    public boolean sendMeta(ClientSession session, Mutable message)
-    {
-        Map<String,Object> ext=message.getExt(true);
-        long now = System.currentTimeMillis();
-        JSON.Literal timesync=new JSON.Literal("{\"tc\":"+now+",\"l\":"+_lag+",\"o\":"+_offset+"}");
-        ext.put("timesync",timesync);
-        return true;
-    }
+	@Override
+	public boolean rcvMeta(ClientSession session, Mutable message) {
+		Map<String, Object> ext = message.getExt(false);
+		if (ext != null) {
+			Map<String, Object> sync = (Map<String, Object>) ext
+					.get("timesync");
+			if (sync != null) {
+				long now = System.currentTimeMillis();
 
-    public int getOffset()
-    {
-        return _offset;
-    }
+				final long tc = ((Number) sync.get("tc")).longValue();
+				final long ts = ((Number) sync.get("ts")).longValue();
+				final int p = ((Number) sync.get("p")).intValue();
+				// final int a=((Number)sync.get("a")).intValue();
 
-    public int getLag()
-    {
-        return _lag;
-    }
+				int l2 = (int) ((now - tc - p) / 2);
+				int o2 = (int) (ts - tc - l2);
 
-    public long getServerTime()
-    {
-        return System.currentTimeMillis()+_offset;
-    }
-    
+				_lag = _lag == 0 ? l2 : (_lag + l2) / 2;
+				_offset = _offset == 0 ? o2 : (_offset + o2) / 2;
+			}
+		}
+
+		return true;
+	}
+
+	@Override
+	public boolean send(ClientSession session, Mutable message) {
+		return true;
+	}
+
+	@Override
+	public boolean sendMeta(ClientSession session, Mutable message) {
+		Map<String, Object> ext = message.getExt(true);
+		long now = System.currentTimeMillis();
+		JSON.Literal timesync = new JSON.Literal("{\"tc\":" + now + ",\"l\":"
+				+ _lag + ",\"o\":" + _offset + "}");
+		ext.put("timesync", timesync);
+		return true;
+	}
+
+	public int getOffset() {
+		return _offset;
+	}
+
+	public int getLag() {
+		return _lag;
+	}
+
+	public long getServerTime() {
+		return System.currentTimeMillis() + _offset;
+	}
+
 }
-
-

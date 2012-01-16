@@ -26,79 +26,68 @@ import org.cometd.bayeux.client.ClientSession.Extension;
  * AckExtension
  * 
  * This client-side extension enables the client to acknowledge to the server
- * the messages that the client has received.
- * For the acknowledgement to work, the server must be configured with the
- * correspondent server-side ack extension. If both client and server support
- * the ack extension, then the ack functionality will take place automatically.
- * By enabling this extension, all messages arriving from the server will arrive
- * via the long poll, so the comet communication will be slightly chattier.
- * The fact that all messages will return via long poll means also that the
- * messages will arrive with total order, which is not guaranteed if messages
- * can arrive via both long poll and normal response.
- * Messages are not acknowledged one by one, but instead a group of messages is
- * acknowledged when long poll returns.
+ * the messages that the client has received. For the acknowledgement to work,
+ * the server must be configured with the correspondent server-side ack
+ * extension. If both client and server support the ack extension, then the ack
+ * functionality will take place automatically. By enabling this extension, all
+ * messages arriving from the server will arrive via the long poll, so the comet
+ * communication will be slightly chattier. The fact that all messages will
+ * return via long poll means also that the messages will arrive with total
+ * order, which is not guaranteed if messages can arrive via both long poll and
+ * normal response. Messages are not acknowledged one by one, but instead a
+ * group of messages is acknowledged when long poll returns.
  * 
  * @author dyu
  */
 
-public class AckExtension implements Extension
-{
+public class AckExtension implements Extension {
 
-    public static final String EXT_FIELD = "ack";
-    
-    private volatile boolean _serverSupportsAcks = false;
-    private volatile int _ackId = -1;
+	public static final String EXT_FIELD = "ack";
 
-    
-    @Override
-    public boolean rcv(ClientSession session, Mutable message)
-    {
-        return true;
-    }
+	private volatile boolean _serverSupportsAcks = false;
+	private volatile int _ackId = -1;
 
-    @Override
-    public boolean rcvMeta(ClientSession session, Mutable message)
-    {
-        if(Channel.META_HANDSHAKE.equals(message.getChannel()))
-        {
-            Map<String,Object> ext = message.getExt(false);
-            _serverSupportsAcks = ext!=null && Boolean.TRUE.equals(ext.get(EXT_FIELD));
-        }
-        else if(_serverSupportsAcks && Boolean.TRUE.equals(message.get(Message.SUCCESSFUL_FIELD)) 
-                && Channel.META_CONNECT.equals(message.getChannel()))
-        {
-            Map<String,Object> ext = message.getExt(false);
-            if(ext!=null)
-            {
-                Object ack = ext.get(EXT_FIELD);
-                if(ack instanceof Number)
-                    _ackId = ((Number)ack).intValue();
-            }
-        }
-        
-        return true;
-    }
+	@Override
+	public boolean rcv(ClientSession session, Mutable message) {
+		return true;
+	}
 
-    @Override
-    public boolean send(ClientSession session, Mutable message)
-    {
-        return true;
-    }
+	@Override
+	public boolean rcvMeta(ClientSession session, Mutable message) {
+		if (Channel.META_HANDSHAKE.equals(message.getChannel())) {
+			Map<String, Object> ext = message.getExt(false);
+			_serverSupportsAcks = ext != null
+					&& Boolean.TRUE.equals(ext.get(EXT_FIELD));
+		} else if (_serverSupportsAcks
+				&& Boolean.TRUE.equals(message.get(Message.SUCCESSFUL_FIELD))
+				&& Channel.META_CONNECT.equals(message.getChannel())) {
+			Map<String, Object> ext = message.getExt(false);
+			if (ext != null) {
+				Object ack = ext.get(EXT_FIELD);
+				if (ack instanceof Number)
+					_ackId = ((Number) ack).intValue();
+			}
+		}
 
-    @Override
-    public boolean sendMeta(ClientSession session, Mutable message)
-    {
-        if(Channel.META_HANDSHAKE.equals(message.getChannel()))
-        {
-            message.getExt(true).put(EXT_FIELD, Boolean.TRUE);
-            _ackId = -1;
-        }
-        else if(_serverSupportsAcks && Channel.META_CONNECT.equals(message.getChannel()))
-        {
-            message.getExt(true).put(EXT_FIELD, _ackId);
-        }
-        
-        return true;
-    }
-    
+		return true;
+	}
+
+	@Override
+	public boolean send(ClientSession session, Mutable message) {
+		return true;
+	}
+
+	@Override
+	public boolean sendMeta(ClientSession session, Mutable message) {
+		if (Channel.META_HANDSHAKE.equals(message.getChannel())) {
+			message.getExt(true).put(EXT_FIELD, Boolean.TRUE);
+			_ackId = -1;
+		} else if (_serverSupportsAcks
+				&& Channel.META_CONNECT.equals(message.getChannel())) {
+			message.getExt(true).put(EXT_FIELD, _ackId);
+		}
+
+		return true;
+	}
+
 }
