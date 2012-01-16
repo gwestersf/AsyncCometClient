@@ -1,8 +1,8 @@
 package org.cometd.bayeux.client;
 
 import org.cometd.bayeux.Message;
-import org.eclipse.jetty.util.log.Log;
-import org.eclipse.jetty.util.log.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * 
@@ -11,7 +11,7 @@ import org.eclipse.jetty.util.log.Logger;
  */
 public class LoggingMessageListener implements MessageListener {
 	
-	private final Logger logger = Log.getLogger(getClass().getName());
+	private final Logger logger = LoggerFactory.getLogger(getClass().getName());
 
 	@Override
 	public void onMessage(ClientSessionChannel channel, Message message) {

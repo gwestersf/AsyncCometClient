@@ -1,6 +1,5 @@
 package org.cometd.bayeux.client;
 
-import org.cometd.bayeux.Bayeux;
 import org.cometd.bayeux.Channel;
 import org.cometd.bayeux.Message;
 

@@ -1,9 +1,7 @@
 package org.cometd.client.transport;
 
-import org.cometd.bayeux.Message;
-import org.cometd.bayeux.client.ClientSessionChannel;
-import org.eclipse.jetty.util.log.Log;
-import org.eclipse.jetty.util.log.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.ning.http.client.AsyncHandler;
 import com.ning.http.client.HttpResponseBodyPart;
@@ -19,13 +17,13 @@ import com.ning.http.client.Response.ResponseBuilder;
  */
 public class AsyncTransportListener implements TransportListener {
 	
-	private final Logger logger = Log.getLogger(getClass().getName());
+	private final Logger logger = LoggerFactory.getLogger(getClass().getName());
 
 	private final ResponseBuilder builder = new ResponseBuilder();
 
 	@Override
 	public void onThrowable(Throwable t) {
-		logger.info(t);
+		logger.error("Non blocking IO problem", t);
 	}
 
 	@Override

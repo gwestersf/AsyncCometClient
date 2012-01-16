@@ -33,12 +33,8 @@ import org.cometd.client.transport.TransportRegistry;
 import org.cometd.common.AbstractClientSession;
 import org.cometd.common.ChannelId;
 import org.cometd.common.HashMapMessage;
-import org.eclipse.jetty.util.QuotedStringTokenizer;
-import org.eclipse.jetty.util.log.Log;
-import org.eclipse.jetty.util.log.Logger;
-
-import com.ning.http.client.Request;
-import com.ning.http.client.RequestBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * @version $Revision$ $Date$
@@ -49,7 +45,7 @@ public class BayeuxClient extends AbstractClientSession implements Bayeux {
 
 	public static final String BAYEUX_VERSION = "1.0";
 
-	private final Logger logger = Log.getLogger(getClass().getName());
+	private final Logger logger = LoggerFactory.getLogger(getClass().getName());
 	private final TransportRegistry transportRegistry = new TransportRegistry();
 	private final Map<String, Object> options = new ConcurrentHashMap<String, Object>();
 	private final Queue<Message.Mutable> messageQueue = new ConcurrentLinkedQueue<Message.Mutable>();
@@ -111,8 +107,7 @@ public class BayeuxClient extends AbstractClientSession implements Bayeux {
 			expirationTime = -1L;
 		else
 			expirationTime += TimeUnit.SECONDS.toMillis(maxAge);
-		ExpirableCookie expirableCookie = new ExpirableCookie(name, value,
-				expirationTime);
+		ExpirableCookie expirableCookie = new ExpirableCookie(name, value, expirationTime);
 		cookies.put(name, expirableCookie);
 	}
 
@@ -397,7 +392,7 @@ public class BayeuxClient extends AbstractClientSession implements Bayeux {
 				return true;
 			} catch (RejectedExecutionException x) {
 				// It has been shut down
-				logger.debug(x);
+				logger.error("Scheuduler problem", x);
 			}
 		}
 		return false;
@@ -550,51 +545,6 @@ public class BayeuxClient extends AbstractClientSession implements Bayeux {
 		UNCONNECTED, HANDSHAKING, CONNECTING, CONNECTED, DISCONNECTING, DISCONNECTED
 	}
 
-	/*
-	private class Listener implements TransportListener {
-		@Override
-		public void onSending(Message[] messages) {
-			BayeuxClient.this.onSending(messages);
-		}
-
-		@Override
-		public void onMessages(List<Message.Mutable> messages) {
-			BayeuxClient.this.onMessages(messages);
-			for (Message.Mutable message : messages)
-				receive(message, message);
-		}
-
-		@Override
-		public void onConnectException(Throwable x) {
-			BayeuxClient.this.onConnectException(x);
-			onFailure();
-		}
-
-		@Override
-		public void onException(Throwable x) {
-			BayeuxClient.this.onException(x);
-			onFailure();
-		}
-
-		@Override
-		public void onExpire() {
-			BayeuxClient.this.onExpire();
-			onFailure();
-		}
-
-		@Override
-		public void onProtocolError(String info) {
-			BayeuxClient.this.onProtocolError(info);
-			onFailure();
-		}
-
-		private void onFailure() {
-			if (getState() == State.CONNECTED)
-				updateState(State.UNCONNECTED);
-			increaseBackoff();
-			followAdvice();
-		}
-	} */
 
 	private class BayeuxClientChannel extends AbstractSessionChannel {
 		private BayeuxClientChannel(ChannelId channelId) {
@@ -692,7 +642,7 @@ public class BayeuxClient extends AbstractClientSession implements Bayeux {
 			exit();
 		}
 		
-		PropertyConfigurator.configure("/Users/gregoryw/gitworkspaces/streaming/target/classes/log4j.properties");
+		PropertyConfigurator.configure(System.getenv("LOG4J"));
 		
 		BayeuxClient client = new BayeuxClient(args[0]);
 		client.handshake();

@@ -20,8 +20,7 @@ public class TimesyncClientExtension implements Extension {
 	public boolean rcvMeta(ClientSession session, Mutable message) {
 		Map<String, Object> ext = message.getExt(false);
 		if (ext != null) {
-			Map<String, Object> sync = (Map<String, Object>) ext
-					.get("timesync");
+			Map<String, Object> sync = (Map<String, Object>) ext.get("timesync");
 			if (sync != null) {
 				long now = System.currentTimeMillis();
 

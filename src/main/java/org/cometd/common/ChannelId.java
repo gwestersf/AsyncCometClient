@@ -18,216 +18,195 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
-
 /* ------------------------------------------------------------ */
-/** Holder of a channel ID broken into path segments
+/**
+ * Holder of a channel ID broken into path segments
  */
-public class ChannelId
-{
-    public final static String WILD="*";
-    public final static String DEEPWILD="**";
+public class ChannelId {
+	public final static String WILD = "*";
+	public final static String DEEPWILD = "**";
 
-    private static final String[] ROOT={};
-    private final String  _name;
-    private final String[] _segments;
-    private final int _wild;
-    private final List<String> _wilds;
-    private final String _parent;
-    
-    public ChannelId(String name)
-    {
-        _name=name;
-        if (name == null || name.length() == 0 || name.charAt(0) != '/' || "/".equals(name))
-            throw new IllegalArgumentException(name);
-        
-        String[] wilds;
+	private final String _name;
+	private final String[] _segments;
+	private final int _wild;
+	private final List<String> _wilds;
+	private final String _parent;
 
-        if (name.charAt(name.length() - 1) == '/')
-            name=name.substring(0,name.length() - 1);
+	public ChannelId(String name) {
+		_name = name;
+		if (name == null || name.length() == 0 || name.charAt(0) != '/'
+				|| "/".equals(name))
+			throw new IllegalArgumentException(name);
 
-        _segments=name.substring(1).split("/");
-        wilds=new String[_segments.length+1];
-        StringBuilder b=new StringBuilder();
-        b.append('/');
+		String[] wilds;
 
-        for (int i=0;i<_segments.length;i++)
-        {
-            if (_segments[i]==null || _segments[i].length()==0)
-                throw new IllegalArgumentException(name);
+		if (name.charAt(name.length() - 1) == '/')
+			name = name.substring(0, name.length() - 1);
 
-            if (i>0)
-                b.append(_segments[i-1]).append('/');
-            wilds[_segments.length-i]=b+"**";
-        }
-        wilds[0]=b+"*";
-        _parent=_segments.length==1?null:b.substring(0,b.length()-1);
+		_segments = name.substring(1).split("/");
+		wilds = new String[_segments.length + 1];
+		StringBuilder b = new StringBuilder();
+		b.append('/');
 
-        if (_segments.length == 0)
-            _wild=0;
-        else if (WILD.equals(_segments[_segments.length - 1]))
-            _wild=1;
-        else if (DEEPWILD.equals(_segments[_segments.length - 1]))
-            _wild=2;
-        else
-            _wild=0;
-        
-        if (_wild==0)
-            _wilds=Collections.unmodifiableList(Arrays.asList(wilds));
-        else
-            _wilds=Collections.emptyList();
-    }
+		for (int i = 0; i < _segments.length; i++) {
+			if (_segments[i] == null || _segments[i].length() == 0)
+				throw new IllegalArgumentException(name);
 
-    public boolean isWild()
-    {
-        return _wild > 0;
-    }
+			if (i > 0)
+				b.append(_segments[i - 1]).append('/');
+			wilds[_segments.length - i] = b + "**";
+		}
+		wilds[0] = b + "*";
+		_parent = _segments.length == 1 ? null : b.substring(0, b.length() - 1);
 
-    public boolean isDeepWild()
-    {
-        return _wild > 1;
-    }
-    
-    public boolean isMeta()
-    {
-        return _segments.length>0 && "meta".equals(_segments[0]);
-    }
-    
-    public boolean isService()
-    {
-        return _segments.length>0 && "service".equals(_segments[0]);
-    }
+		if (_segments.length == 0)
+			_wild = 0;
+		else if (WILD.equals(_segments[_segments.length - 1]))
+			_wild = 1;
+		else if (DEEPWILD.equals(_segments[_segments.length - 1]))
+			_wild = 2;
+		else
+			_wild = 0;
 
-    @Override
-    public boolean equals(Object obj)
-    {
-        if (this == obj)
-            return true;
+		if (_wild == 0)
+			_wilds = Collections.unmodifiableList(Arrays.asList(wilds));
+		else
+			_wilds = Collections.emptyList();
+	}
 
-        if (obj instanceof ChannelId)
-        {
-            ChannelId id = (ChannelId)obj;
-            if (id.depth()==depth())
-            {
-                for (int i=id.depth();i-->0;)
-                    if (!id.getSegment(i).equals(getSegment(i)))
-                        return false;
-                return true;
-            }
-        }
+	public boolean isWild() {
+		return _wild > 0;
+	}
 
-        return false;
-    }
+	public boolean isDeepWild() {
+		return _wild > 1;
+	}
 
-    /* ------------------------------------------------------------ */
-    /** Match channel IDs with wildcard support
-     * @param name
-     * @return true if this channelID matches the passed channel ID. If this channel is wild, then matching is wild. 
-     * If the passed channel is wild, then it is the same as an equals call.
-     */
-    public boolean matches(ChannelId name)
-    {
-        if (name.isWild())
-            return equals(name);
+	public boolean isMeta() {
+		return _segments.length > 0 && "meta".equals(_segments[0]);
+	}
 
-        switch(_wild)
-        {
-            case 0:
-                return equals(name);
-            case 1:
-                if (name._segments.length != _segments.length)
-                    return false;
-                for (int i=_segments.length - 1; i-- > 0;)
-                    if (!_segments[i].equals(name._segments[i]))
-                        return false;
-                return true;
+	public boolean isService() {
+		return _segments.length > 0 && "service".equals(_segments[0]);
+	}
 
-            case 2:
-                if (name._segments.length < _segments.length)
-                    return false;
-                for (int i=_segments.length - 1; i-- > 0;)
-                    if (!_segments[i].equals(name._segments[i]))
-                        return false;
-                return true;
-        }
-        return false;
-    }
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj)
+			return true;
 
-    @Override
-    public int hashCode()
-    {
-        return _name.hashCode();
-    }
+		if (obj instanceof ChannelId) {
+			ChannelId id = (ChannelId) obj;
+			if (id.depth() == depth()) {
+				for (int i = id.depth(); i-- > 0;)
+					if (!id.getSegment(i).equals(getSegment(i)))
+						return false;
+				return true;
+			}
+		}
 
-    @Override
-    public String toString()
-    {
-        return _name;
-    }
+		return false;
+	}
 
-    public int depth()
-    {
-        return _segments.length;
-    }
-    
-    /* ------------------------------------------------------------ */
-    public boolean isAncestorOf(ChannelId id)
-    {
-        if (isWild() || depth() >= id.depth())
-            return false;
+	/* ------------------------------------------------------------ */
+	/**
+	 * Match channel IDs with wildcard support
+	 * 
+	 * @param name
+	 * @return true if this channelID matches the passed channel ID. If this
+	 *         channel is wild, then matching is wild. If the passed channel is
+	 *         wild, then it is the same as an equals call.
+	 */
+	public boolean matches(ChannelId name) {
+		if (name.isWild())
+			return equals(name);
 
-        for (int i=_segments.length; i--> 0;)
-        {    
-            if (!_segments[i].equals(id._segments[i]))
-                return false;
-        }
-        return true;
-    }
-    
-    /* ------------------------------------------------------------ */
-    public boolean isParentOf(ChannelId id)
-    {
-        if (isWild() || depth() != id.depth()-1)
-            return false;
+		switch (_wild) {
+		case 0:
+			return equals(name);
+		case 1:
+			if (name._segments.length != _segments.length)
+				return false;
+			for (int i = _segments.length - 1; i-- > 0;)
+				if (!_segments[i].equals(name._segments[i]))
+					return false;
+			return true;
 
-        for (int i=_segments.length; i--> 0;)
-        {    
-            if (!_segments[i].equals(id._segments[i]))
-                return false;
-        }
-        return true;
-    }
-    
-    /* ------------------------------------------------------------ */
-    public String getParent()
-    {
-        return _parent;
-    }
-    
-    /* ------------------------------------------------------------ */
-    public String getSegment(int i)
-    {
-        if (i > _segments.length)
-            return null;
-        return _segments[i];
-    }
+		case 2:
+			if (name._segments.length < _segments.length)
+				return false;
+			for (int i = _segments.length - 1; i-- > 0;)
+				if (!_segments[i].equals(name._segments[i]))
+					return false;
+			return true;
+		}
+		return false;
+	}
 
-    /* ------------------------------------------------------------ */
-    /**
-     * @return The list of wilds channels that match this channel, or 
-     * the empty list if this channel is already wild.
-     */
-    public List<String> getWilds()
-    {
-        return _wilds;
-    }
-    
-    public static boolean isMeta(String channelId)
-    {
-        return channelId!=null && channelId.startsWith("/meta/");
-    }
-    
-    public static boolean isService(String channelId)
-    {
-        return channelId!=null && channelId.startsWith("/service/");
-    }
+	@Override
+	public int hashCode() {
+		return _name.hashCode();
+	}
+
+	@Override
+	public String toString() {
+		return _name;
+	}
+
+	public int depth() {
+		return _segments.length;
+	}
+
+	/* ------------------------------------------------------------ */
+	public boolean isAncestorOf(ChannelId id) {
+		if (isWild() || depth() >= id.depth())
+			return false;
+
+		for (int i = _segments.length; i-- > 0;) {
+			if (!_segments[i].equals(id._segments[i]))
+				return false;
+		}
+		return true;
+	}
+
+	/* ------------------------------------------------------------ */
+	public boolean isParentOf(ChannelId id) {
+		if (isWild() || depth() != id.depth() - 1)
+			return false;
+
+		for (int i = _segments.length; i-- > 0;) {
+			if (!_segments[i].equals(id._segments[i]))
+				return false;
+		}
+		return true;
+	}
+
+	/* ------------------------------------------------------------ */
+	public String getParent() {
+		return _parent;
+	}
+
+	/* ------------------------------------------------------------ */
+	public String getSegment(int i) {
+		if (i > _segments.length)
+			return null;
+		return _segments[i];
+	}
+
+	/* ------------------------------------------------------------ */
+	/**
+	 * @return The list of wilds channels that match this channel, or the empty
+	 *         list if this channel is already wild.
+	 */
+	public List<String> getWilds() {
+		return _wilds;
+	}
+
+	public static boolean isMeta(String channelId) {
+		return channelId != null && channelId.startsWith("/meta/");
+	}
+
+	public static boolean isService(String channelId) {
+		return channelId != null && channelId.startsWith("/service/");
+	}
 }
