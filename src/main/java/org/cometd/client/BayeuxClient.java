@@ -1,5 +1,7 @@
 package org.cometd.client;
 
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -16,12 +18,16 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.log4j.PropertyConfigurator;
 import org.cometd.bayeux.Bayeux;
 import org.cometd.bayeux.Channel;
 import org.cometd.bayeux.Message;
 import org.cometd.bayeux.Transport;
 import org.cometd.bayeux.client.ClientSession;
+import org.cometd.bayeux.client.LoggingMessageListener;
+import org.cometd.client.transport.AsyncTransportListener;
 import org.cometd.client.transport.ClientTransport;
+import org.cometd.client.transport.LongPollingTransport;
 import org.cometd.client.transport.TransportListener;
 import org.cometd.client.transport.TransportRegistry;
 import org.cometd.common.AbstractClientSession;
@@ -37,7 +43,7 @@ import com.ning.http.client.RequestBuilder;
 /**
  * @version $Revision$ $Date$
  */
-public class BayeuxClient extends AbstractClientSession implements Bayeux, TransportListener {
+public class BayeuxClient extends AbstractClientSession implements Bayeux {
 	public static final String BACKOFF_INCREMENT_OPTION = "backoffIncrement";
 	public static final String MAX_BACKOFF_OPTION = "maxBackoff";
 
@@ -48,8 +54,8 @@ public class BayeuxClient extends AbstractClientSession implements Bayeux, Trans
 	private final Map<String, Object> options = new ConcurrentHashMap<String, Object>();
 	private final Queue<Message.Mutable> messageQueue = new ConcurrentLinkedQueue<Message.Mutable>();
 	private Map<String, ExpirableCookie> cookies = new ConcurrentHashMap<String, ExpirableCookie>();
-	private final TransportListener listener = new Listener();
-	private final Request url;
+	private final TransportListener listener = new AsyncTransportListener();
+	private final String url;
 	private volatile Map<String, Object> handshakeFields;
 	private volatile ScheduledExecutorService scheduler;
 	private volatile boolean shutdownScheduler;
@@ -62,22 +68,18 @@ public class BayeuxClient extends AbstractClientSession implements Bayeux, Trans
 	private volatile long maxBackoff;
 	private volatile State state = State.UNCONNECTED;
 
-	public BayeuxClient(String url, ClientTransport transport,
-			ClientTransport... transports) {
-		this(url, null, transport, transports);
+	public BayeuxClient(String url) {
+		this(url, null, LongPollingTransport.create(null));
 	}
 
-	public BayeuxClient(String url, ScheduledExecutorService scheduler,
-			ClientTransport transport, ClientTransport... transports) {
+	public BayeuxClient(String url, ScheduledExecutorService scheduler, ClientTransport transport) {
 		if (transport == null)
 			throw new IllegalArgumentException("Transport cannot be null");
 
-		this.url = new RequestBuilder().setUrl(url).build();
+		this.url = url;
 		this.scheduler = scheduler;
 
 		transportRegistry.add(transport);
-		for (ClientTransport t : transports)
-			transportRegistry.add(t);
 	}
 
 	public long getBackoffIncrement() {
@@ -516,8 +518,7 @@ public class BayeuxClient extends AbstractClientSession implements Bayeux, Trans
 		}
 		if (!messageList.isEmpty()) {
 			logger.debug("Sending messages {}", messageList);
-			transport.send(listener, messageList
-					.toArray(new Message.Mutable[messageList.size()]));
+			transport.send(listener, messageList.toArray(new Message.Mutable[messageList.size()]));
 		}
 	}
 
@@ -541,56 +542,6 @@ public class BayeuxClient extends AbstractClientSession implements Bayeux, Trans
 	}
 
 	@Override
-	public void onSending(Message[] messages) {
-	}
-
-	@Override
-	public void onMessages(List<Message.Mutable> messages) {
-	}
-
-	@Override
-	public void onConnectException(Throwable x) {
-	}
-
-	@Override
-	public void onException(Throwable x) {
-	}
-
-	@Override
-	public void onExpire() {
-	}
-
-	@Override
-	public void onProtocolError(String info) {
-	}
-
-	/**
-	 * Customizes an Exchange. Called when an exchange is about to be sent to
-	 * allow Cookies and Credentials to be customized. Default implementation
-	 * sets any cookies
-	
-	public void customize(HttpExchange exchange) {
-		StringBuilder builder = null;
-		for (String cookieName : cookies.keySet()) {
-			if (builder == null)
-				builder = new StringBuilder();
-			else
-				builder.append("; ");
-
-			// Expiration is handled by getCookie()
-			String value = getCookie(cookieName);
-			if (value != null) {
-				builder.append(QuotedStringTokenizer.quote(cookieName));
-				builder.append("=");
-				builder.append(QuotedStringTokenizer.quote(value));
-			}
-		}
-
-		if (builder != null)
-			exchange.setRequestHeader(HttpHeaders.COOKIE, builder.toString());
-	} */
-
-	@Override
 	public String toString() {
 		return super.toString() + ":" + url + ":" + getState();
 	}
@@ -599,6 +550,7 @@ public class BayeuxClient extends AbstractClientSession implements Bayeux, Trans
 		UNCONNECTED, HANDSHAKING, CONNECTING, CONNECTED, DISCONNECTING, DISCONNECTED
 	}
 
+	/*
 	private class Listener implements TransportListener {
 		@Override
 		public void onSending(Message[] messages) {
@@ -642,7 +594,7 @@ public class BayeuxClient extends AbstractClientSession implements Bayeux, Trans
 			increaseBackoff();
 			followAdvice();
 		}
-	}
+	} */
 
 	private class BayeuxClientChannel extends AbstractSessionChannel {
 		private BayeuxClientChannel(ChannelId channelId) {
@@ -715,5 +667,37 @@ public class BayeuxClient extends AbstractClientSession implements Bayeux, Trans
 		public long getExpirationTime() {
 			return expirationTime;
 		}
+	}
+	
+	private static void exit() {
+		System.out.println("Please pass 1st argument with a valid URL to a cometd server endpoint.");
+		System.out.println("Example: https://na1.salesforce.com/cometd/23.0/");
+		System.out.println("Please pass 2nd argument with a subscription name.");
+		System.out.println("Example: myTopic");
+		System.exit(0);
+	}
+	
+	/**
+	 * 
+	 * @param args
+	 */
+	public static void main(String[] args) {
+		if(args.length != 2) {
+			exit();
+		}
+		
+		try {
+			new URL(args[0]);
+		} catch (MalformedURLException e) {
+			exit();
+		}
+		
+		PropertyConfigurator.configure("/Users/gregoryw/gitworkspaces/streaming/target/classes/log4j.properties");
+		
+		BayeuxClient client = new BayeuxClient(args[0]);
+		client.handshake();
+		client.getChannel("/topics/" + args[1]).subscribe(new LoggingMessageListener());
+		
+		while(true) { }
 	}
 }

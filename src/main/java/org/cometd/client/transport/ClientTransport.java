@@ -37,7 +37,7 @@ public abstract class ClientTransport extends AbstractTransport {
 	}
 
 	/* ------------------------------------------------------------ */
-	public void init(BayeuxClient bayeux, Request uri) {
+	public void init(BayeuxClient bayeux, String uri) {
 		_timeout = getOption(TIMEOUT_OPTION, _timeout);
 		_interval = getOption(INTERVAL_OPTION, _interval);
 		_maxNetworkDelay = getOption(MAX_NETWORK_DELAY_OPTION, _maxNetworkDelay);

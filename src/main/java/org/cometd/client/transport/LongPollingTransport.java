@@ -14,9 +14,12 @@ import java.util.regex.Pattern;
 
 import org.cometd.bayeux.Channel;
 import org.cometd.bayeux.Message;
+import org.cometd.bayeux.Message.Mutable;
 import org.cometd.client.BayeuxClient;
 import org.eclipse.jetty.util.QuotedStringTokenizer;
 import org.eclipse.jetty.util.ajax.JSON;
+import org.eclipse.jetty.util.log.Log;
+import org.eclipse.jetty.util.log.Logger;
 import org.jboss.netty.handler.codec.http.HttpHeaders;
 
 import com.ning.http.client.AsyncHandler;
@@ -35,6 +38,8 @@ import com.ning.http.client.Response.ResponseBuilder;
  */
 public class LongPollingTransport extends ClientTransport {
 	
+	private final Logger logger = Log.getLogger(getClass().getName());
+	
 	//TODO: gw: put these in a jaxb config file so we can change them without sys test recompiling
 	public static final int IDLE_TIMEOUT_IN_MS = 5000;
 	public static final int MAX_CONNECTIONS_PER_HOST = 65535;
@@ -44,14 +49,18 @@ public class LongPollingTransport extends ClientTransport {
 	//private final List<HttpExchange> _exchanges = new ArrayList<HttpExchange>();
 	private volatile boolean _aborted;
 	private volatile BayeuxClient _bayeuxClient;
-	private volatile Request _uri;
+	private volatile String _uri;
 	private volatile boolean _appendMessageType;
 
 	public static LongPollingTransport create(Map<String, Object> options) {
-		AsyncHttpClientConfig config = new AsyncHttpClientConfig.Builder(). 
-			setIdleConnectionInPoolTimeoutInMs(IDLE_TIMEOUT_IN_MS).
-			setMaximumConnectionsPerHost(MAX_CONNECTIONS_PER_HOST).
-			build();
+		AsyncHttpClientConfig config = new AsyncHttpClientConfig.Builder()
+			.setIdleConnectionInPoolTimeoutInMs(IDLE_TIMEOUT_IN_MS)
+			.setMaximumConnectionsPerHost(MAX_CONNECTIONS_PER_HOST)
+			.setRequestTimeoutInMs(30000)
+			.setAllowPoolingConnection(true)
+			.setCompressionEnabled(false)
+			.setAllowSslConnectionPool(true)
+			.build();
 		
 		AsyncHttpClient httpClient = new AsyncHttpClient(config);
 		return create(options, httpClient);
@@ -72,7 +81,7 @@ public class LongPollingTransport extends ClientTransport {
 	}
 
 	@Override
-	public void init(BayeuxClient bayeux, Request uri) {
+	public void init(BayeuxClient bayeux, String uri) {
 		_aborted = false;
 		_bayeuxClient = bayeux;
 		_uri = uri;
@@ -98,6 +107,7 @@ public class LongPollingTransport extends ClientTransport {
 	public void reset() {
 	}
 	
+	/*
 	private String getUrl(Message.Mutable... messages) {
 		String url = _uri.toString();
 		if (_appendMessageType && messages.length == 1 && messages[0].isMeta()) {
@@ -108,170 +118,28 @@ public class LongPollingTransport extends ClientTransport {
 			url += type;
 		} 
 		return url;
+	}*/
+	
+	
+	public void send(Mutable... messages) {
+		send(new AsyncTransportListener(), messages);
 	}
 
 	@Override
 	public void send(final TransportListener listener, Message.Mutable... messages) {
 		String content = JSON.toString(messages);
 		
-		RequestBuilder builder = new RequestBuilder("PUT");
-		Request request = builder.setUrl(getUrl(messages))
-			.add
-		
-		AsyncHandler<Response> asyncHandler = new CometAsyncHandler<Response>();
+		RequestBuilder builder = new RequestBuilder("POST");
+		Request request = builder.setUrl(_uri.toString())
+			.setBody(content)
+			.setBodyEncoding("UTF-8")
+			.setHeader("Content-Type", "application/json;charset=UTF-8")
+			.build();
 
-
-
-		
-		httpExchange.setRequestContentType("application/json;charset=UTF-8");
 		try {
-			httpExchange.setRequestContent(new ByteBuffer(content, "UTF-8"));
-			
-			if (_bayeuxClient != null)
-				_bayeuxClient.customize(httpExchange);
-
-			synchronized (this) {
-				if (_aborted)
-					throw new IllegalStateException("Aborted");
-				_exchanges.add(httpExchange);
-			}
-
-			_httpClient.send(httpExchange);
-		} catch (Exception x) {
-			listener.onException(x);
-		}
-	}
-	
-	private class CometAsyncHandler<Response> implements AsyncHandler<Response> {
-		private final ResponseBuilder builder = new ResponseBuilder();
-
-		@Override
-		public void onThrowable(Throwable t) {
-			// TODO Auto-generated method stub
-			
-		}
-
-		@Override
-		public AsyncHandler.STATE onBodyPartReceived(HttpResponseBodyPart bodyPart) throws Exception {
-			// TODO Auto-generated method stub
-			return null;
-		}
-
-		@Override
-		public AsyncHandler.STATE onStatusReceived(HttpResponseStatus responseStatus) throws Exception {
-			// TODO Auto-generated method stub
-			return null;
-		}
-
-		@Override
-		public AsyncHandler.STATE onHeadersReceived(HttpResponseHeaders headers) throws Exception {
-			// TODO Auto-generated method stub
-			return null;
-		}
-
-		@Override
-		public Request onCompleted() throws Exception {
-			// TODO Auto-generated method stub
-			return null;
-		}
-		
-	}
-
-	private class TransportExchange extends ContentExchange {
-		private final TransportListener _listener;
-		private final Message[] _messages;
-
-		private TransportExchange(TransportListener listener, Message... messages) {
-			super(true);
-			_listener = listener;
-			_messages = messages;
-		}
-
-		@Override
-		protected void onRequestCommitted() throws IOException {
-			_listener.onSending(_messages);
-		}
-
-		@Override
-		protected void onResponseHeader(Buffer name, Buffer value) throws IOException {
-			super.onResponseHeader(name, value);
-			int headerName = HttpHeaders.CACHE.getOrdinal(name);
-			if (headerName == HttpHeaders.SET_COOKIE_ORDINAL) {
-				QuotedStringTokenizer tokenizer = new QuotedStringTokenizer(
-						value.toString(), "=;", false, false);
-				tokenizer.setSingle(false);
-
-				String cookieName = null;
-				if (tokenizer.hasMoreTokens())
-					cookieName = tokenizer.nextToken();
-
-				String cookieValue = null;
-				if (tokenizer.hasMoreTokens())
-					cookieValue = tokenizer.nextToken();
-
-				int maxAge = -1;
-
-				if (cookieName != null && cookieValue != null) {
-					while (tokenizer.hasMoreTokens()) {
-						String token = tokenizer.nextToken();
-						if ("Expires".equalsIgnoreCase(token)) {
-							try {
-								Date date = new SimpleDateFormat(
-										"EEE, dd-MMM-yy HH:mm:ss 'GMT'")
-										.parse(tokenizer.nextToken());
-								Long maxAgeValue = TimeUnit.MILLISECONDS
-										.toSeconds(date.getTime()
-												- System.currentTimeMillis());
-								maxAge = maxAgeValue > 0 ? maxAgeValue
-										.intValue() : 0;
-							} catch (ParseException ignored) {
-							}
-						} else if ("Max-Age".equalsIgnoreCase(token)) {
-							try {
-								maxAge = Integer.parseInt(tokenizer.nextToken());
-							} catch (NumberFormatException ignored) {
-							}
-						}
-					}
-
-					_bayeuxClient.setCookie(cookieName, cookieValue, maxAge);
-				}
-			}
-		}
-
-		protected void onResponseComplete() throws IOException {
-			complete();
-			if (getResponseStatus() == 200) {
-				String content = getResponseContent();
-				if (content != null && content.length() > 0) {
-					List<Message.Mutable> messages = toMessages(getResponseContent());
-					_listener.onMessages(messages);
-				} else
-					_listener.onProtocolError("Empty response: " + this);
-			} else {
-				_listener.onProtocolError("Unexpected response " + getResponseStatus() + ": " + this);
-			}
-		}
-
-		protected void onConnectionFailed(Throwable x) {
-			complete();
-			_listener.onConnectException(x);
-		}
-
-		protected void onException(Throwable x) {
-			complete();
-			_listener.onException(x);
-		}
-
-		protected void onExpire() {
-			complete();
-			_listener.onExpire();
-		}
-
-		private void complete() {
-			synchronized (LongPollingTransport.this) {
-				_exchanges.remove(this);
-			}
+			_httpClient.executeRequest(request, listener);
+		} catch (IOException e) {
+			logger.info(e);
 		}
 	}
 }
